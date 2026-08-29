@@ -2,7 +2,65 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Notes App</title>
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background-color: #f9fafb;
+        color: #111827;
+        margin: 0;
+        padding: 24px;
+      }
+      .container {
+        max-width: 640px;
+        margin: 0 auto;
+        background: #ffffff;
+        padding: 24px;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      }
+      input, textarea {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 10px;
+        margin-bottom: 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        font-size: 14px;
+      }
+      button {
+        padding: 8px 14px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        background: #2563eb;
+        color: white;
+        cursor: pointer;
+        font-weight: 500;
+      }
+      button.secondary {
+        background: #f3f4f6;
+        color: #374151;
+        margin-left: 8px;
+      }
+      button.danger {
+        background: #ef4444;
+        color: white;
+        border: none;
+      }
+      .note-card {
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        padding: 12px;
+        margin-bottom: 10px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .actions button {
+        margin-left: 6px;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
@@ -10,94 +68,153 @@
       import React, { useState, useEffect } from "https://esm.sh/react@18";
       import ReactDOM from "https://esm.sh/react-dom@18/client";
 
-      const API_BASE_URL = window.API_URL || "http://127.0.0.1:8000";
-
       function App() {
         const [notes, setNotes] = useState([]);
         const [title, setTitle] = useState("");
         const [content, setContent] = useState("");
         const [editingId, setEditingId] = useState(null);
         const [selectedNote, setSelectedNote] = useState(null);
-        const [backendUrl, setBackendUrl] = useState(API_BASE_URL);
+        const [backendUrl, setBackendUrl] = useState(
+          localStorage.getItem("backend_url") || "http://127.0.0.1:8000"
+        );
+
+        const handleUrlChange = (e) => {
+          const url = e.target.value.trim().replace(/\/$/, "");
+          setBackendUrl(url);
+          localStorage.setItem("backend_url", url);
+        };
 
         const fetchNotes = async () => {
+          if (!backendUrl) return;
           try {
-            const res = await fetch(`${backendUrl}/notes`);
-            const data = await res.json();
-            setNotes(Array.isArray(data) ? data : []);
+            const cleanUrl = backendUrl.replace(/\/$/, "");
+            const res = await fetch(`${cleanUrl}/notes`);
+            if (res.ok) {
+              const data = await res.json();
+              setNotes(Array.isArray(data) ? data : []);
+            }
           } catch (e) {
-            console.error(e);
+            console.error("Failed to fetch notes:", e);
           }
         };
 
-        useEffect(() => { fetchNotes(); }, [backendUrl]);
+        useEffect(() => {
+          fetchNotes();
+        }, [backendUrl]);
+
+        const startEdit = (note) => {
+          setEditingId(note.id);
+          setTitle(note.title);
+          setContent(note.content || "");
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        };
+
+        const cancelEdit = () => {
+          setEditingId(null);
+          setTitle("");
+          setContent("");
+        };
 
         const handleSubmit = async (e) => {
           e.preventDefault();
-          const url = editingId ? `${backendUrl}/notes/${editingId}` : `${backendUrl}/notes`;
+          if (!title.trim()) return;
+
+          const cleanUrl = backendUrl.replace(/\/$/, "");
+          const url = editingId ? `${cleanUrl}/notes/${editingId}` : `${cleanUrl}/notes`;
           const method = editingId ? "PUT" : "POST";
-          await fetch(url, {
-            method,
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ title, content })
-          });
-          setTitle("");
-          setContent("");
-          setEditingId(null);
-          fetchNotes();
+
+          try {
+            const res = await fetch(url, {
+              method,
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ title, content })
+            });
+
+            if (res.ok) {
+              setTitle("");
+              setContent("");
+              setEditingId(null);
+              fetchNotes();
+            } else {
+              const err = await res.json();
+              alert(`Error: ${err.detail || "Request failed"}`);
+            }
+          } catch (err) {
+            alert("Network error: Could not reach backend.");
+          }
         };
 
         const deleteNote = async (id) => {
-          await fetch(`${backendUrl}/notes/${id}`, { method: "DELETE" });
-          fetchNotes();
+          const cleanUrl = backendUrl.replace(/\/$/, "");
+          try {
+            const res = await fetch(`${cleanUrl}/notes/${id}`, { method: "DELETE" });
+            if (res.ok) {
+              if (selectedNote && selectedNote.id === id) setSelectedNote(null);
+              fetchNotes();
+            }
+          } catch (err) {
+            console.error(err);
+          }
         };
 
         const viewNote = async (id) => {
-          const res = await fetch(`${backendUrl}/notes/${id}`);
-          const data = await res.json();
-          setSelectedNote(data);
+          const cleanUrl = backendUrl.replace(/\/$/, "");
+          try {
+            const res = await fetch(`${cleanUrl}/notes/${id}`);
+            if (res.ok) {
+              const data = await res.json();
+              setSelectedNote(data);
+            }
+          } catch (err) {
+            console.error(err);
+          }
         };
 
-        return React.createElement("div", { style: { maxWidth: "600px", margin: "2rem auto", fontFamily: "sans-serif" } },
-          React.createElement("h2", null, "Notes App"),
-          React.createElement("div", { style: { marginBottom: "1rem" } },
-            React.createElement("label", null, "Backend URL: "),
+        return React.createElement("div", { className: "container" },
+          React.createElement("h2", { style: { marginTop: 0 } }, "Notes App"),
+          React.createElement("div", { style: { marginBottom: "16px" } },
+            React.createElement("label", { style: { display: "block", fontSize: "13px", color: "#6b7280", marginBottom: "4px" } }, "Backend API URL:"),
             React.createElement("input", {
-              style: { width: "70%", padding: "4px" },
               value: backendUrl,
-              onChange: (e) => setBackendUrl(e.target.value)
+              onChange: handleUrlChange,
+              placeholder: "https://your-backend.onrender.com"
             })
           ),
-          React.createElement("form", { onSubmit: handleSubmit, style: { marginBottom: "1rem" } },
+          React.createElement("form", { onSubmit: handleSubmit, style: { marginBottom: "20px", background: "#f9fafb", padding: "16px", borderRadius: "6px" } },
+            React.createElement("h3", { style: { marginTop: 0, fontSize: "16px" } }, editingId ? `Editing Note #${editingId}` : "Create Note"),
             React.createElement("input", {
-              placeholder: "Title",
+              placeholder: "Title (required)",
               required: true,
               value: title,
-              onChange: (e) => setTitle(e.target.value),
-              style: { width: "100%", marginBottom: "0.5rem", padding: "8px", boxSizing: "border-box" }
+              onChange: (e) => setTitle(e.target.value)
             }),
             React.createElement("textarea", {
-              placeholder: "Content",
+              placeholder: "Content (optional)",
+              rows: 3,
               value: content,
-              onChange: (e) => setContent(e.target.value),
-              style: { width: "100%", marginBottom: "0.5rem", padding: "8px", boxSizing: "border-box" }
+              onChange: (e) => setContent(e.target.value)
             }),
-            React.createElement("button", { type: "submit" }, editingId ? "Save Note" : "Add Note"),
-            editingId && React.createElement("button", { type: "button", onClick: () => { setEditingId(null); setTitle(""); setContent(""); }, style: { marginLeft: "8px" } }, "Cancel")
+            React.createElement("button", { type: "submit" }, editingId ? "Save Changes" : "Add Note"),
+            editingId && React.createElement("button", { type: "button", className: "secondary", onClick: cancelEdit }, "Cancel")
           ),
-          selectedNote && React.createElement("div", { style: { background: "#eee", padding: "10px", marginBottom: "10px" } },
-            React.createElement("h4", null, `Note #${selectedNote.id}: ${selectedNote.title}`),
-            React.createElement("p", null, selectedNote.content || "(empty)"),
-            React.createElement("button", { onClick: () => setSelectedNote(null) }, "Close")
+          selectedNote && React.createElement("div", { style: { background: "#eff6ff", border: "1px solid #bfdbfe", padding: "16px", borderRadius: "6px", marginBottom: "16px" } },
+            React.createElement("h4", { style: { margin: "0 0 8px 0", color: "#1e40af" } }, `Note #${selectedNote.id}: ${selectedNote.title}`),
+            React.createElement("p", { style: { margin: "0 0 12px 0", color: "#374151" } }, selectedNote.content || "(No content)"),
+            React.createElement("button", { className: "secondary", onClick: () => setSelectedNote(null) }, "Close View")
           ),
-          React.createElement("ul", { style: { listStyle: "none", padding: 0 } },
+          React.createElement("h3", { style: { fontSize: "16px", marginBottom: "10px" } }, `Notes List (${notes.length})`),
+          notes.length === 0 && React.createElement("p", { style: { color: "#6b7280" } }, "No notes found."),
+          React.createElement("div", null,
             notes.map((n) =>
-              React.createElement("li", { key: n.id, style: { border: "1px solid #ccc", padding: "8px", marginBottom: "6px", display: "flex", justifyContent: "space-between" } },
-                React.createElement("span", null, React.createElement("strong", null, n.title), ` - ${n.content}`),
+              React.createElement("div", { key: n.id, className: "note-card" },
                 React.createElement("div", null,
-                  React.createElement("button", { onClick: () => viewNote(n.id) }, "View"),
-                  React.createElement("button", { onClick: () => { setEditingId(n.id); setTitle(n.title); setContent(n.content); }, style: { margin: "0 4px" } }, "Edit"),
-                  React.createElement("button", { onClick: () => deleteNote(n.id), style: { color: "red" } }, "Delete")
+                  React.createElement("strong", null, n.title),
+                  n.content ? React.createElement("span", { style: { color: "#4b5563", marginLeft: "6px" } }, `— ${n.content}`) : null
+                ),
+                React.createElement("div", { className: "actions" },
+                  React.createElement("button", { className: "secondary", onClick: () => viewNote(n.id) }, "View"),
+                  React.createElement("button", { className: "secondary", onClick: () => startEdit(n) }, "Edit"),
+                  React.createElement("button", { className: "danger", onClick: () => deleteNote(n.id) }, "Delete")
                 )
               )
             )
