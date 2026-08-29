@@ -68,39 +68,34 @@
       import React, { useState, useEffect } from "https://esm.sh/react@18";
       import ReactDOM from "https://esm.sh/react-dom@18/client";
 
+      const API_BASE_URL = "https://notes-backend-6tmv.onrender.com";
+
       function App() {
         const [notes, setNotes] = useState([]);
         const [title, setTitle] = useState("");
         const [content, setContent] = useState("");
         const [editingId, setEditingId] = useState(null);
         const [selectedNote, setSelectedNote] = useState(null);
-        const [backendUrl, setBackendUrl] = useState(
-          localStorage.getItem("backend_url") || "http://127.0.0.1:8000"
-        );
-
-        const handleUrlChange = (e) => {
-          const url = e.target.value.trim().replace(/\/$/, "");
-          setBackendUrl(url);
-          localStorage.setItem("backend_url", url);
-        };
+        const [loading, setLoading] = useState(false);
 
         const fetchNotes = async () => {
-          if (!backendUrl) return;
+          setLoading(true);
           try {
-            const cleanUrl = backendUrl.replace(/\/$/, "");
-            const res = await fetch(`${cleanUrl}/notes`);
+            const res = await fetch(`${API_BASE_URL}/notes`);
             if (res.ok) {
               const data = await res.json();
               setNotes(Array.isArray(data) ? data : []);
             }
           } catch (e) {
             console.error("Failed to fetch notes:", e);
+          } finally {
+            setLoading(false);
           }
         };
 
         useEffect(() => {
           fetchNotes();
-        }, [backendUrl]);
+        }, []);
 
         const startEdit = (note) => {
           setEditingId(note.id);
@@ -119,8 +114,7 @@
           e.preventDefault();
           if (!title.trim()) return;
 
-          const cleanUrl = backendUrl.replace(/\/$/, "");
-          const url = editingId ? `${cleanUrl}/notes/${editingId}` : `${cleanUrl}/notes`;
+          const url = editingId ? `${API_BASE_URL}/notes/${editingId}` : `${API_BASE_URL}/notes`;
           const method = editingId ? "PUT" : "POST";
 
           try {
@@ -140,14 +134,13 @@
               alert(`Error: ${err.detail || "Request failed"}`);
             }
           } catch (err) {
-            alert("Network error: Could not reach backend.");
+            alert("Network error: Could not reach backend. If the backend was sleeping, wait 30 seconds and retry.");
           }
         };
 
         const deleteNote = async (id) => {
-          const cleanUrl = backendUrl.replace(/\/$/, "");
           try {
-            const res = await fetch(`${cleanUrl}/notes/${id}`, { method: "DELETE" });
+            const res = await fetch(`${API_BASE_URL}/notes/${id}`, { method: "DELETE" });
             if (res.ok) {
               if (selectedNote && selectedNote.id === id) setSelectedNote(null);
               fetchNotes();
@@ -158,9 +151,8 @@
         };
 
         const viewNote = async (id) => {
-          const cleanUrl = backendUrl.replace(/\/$/, "");
           try {
-            const res = await fetch(`${cleanUrl}/notes/${id}`);
+            const res = await fetch(`${API_BASE_URL}/notes/${id}`);
             if (res.ok) {
               const data = await res.json();
               setSelectedNote(data);
@@ -172,14 +164,7 @@
 
         return React.createElement("div", { className: "container" },
           React.createElement("h2", { style: { marginTop: 0 } }, "Notes App"),
-          React.createElement("div", { style: { marginBottom: "16px" } },
-            React.createElement("label", { style: { display: "block", fontSize: "13px", color: "#6b7280", marginBottom: "4px" } }, "Backend API URL:"),
-            React.createElement("input", {
-              value: backendUrl,
-              onChange: handleUrlChange,
-              placeholder: "https://your-backend.onrender.com"
-            })
-          ),
+          
           React.createElement("form", { onSubmit: handleSubmit, style: { marginBottom: "20px", background: "#f9fafb", padding: "16px", borderRadius: "6px" } },
             React.createElement("h3", { style: { marginTop: 0, fontSize: "16px" } }, editingId ? `Editing Note #${editingId}` : "Create Note"),
             React.createElement("input", {
@@ -197,13 +182,20 @@
             React.createElement("button", { type: "submit" }, editingId ? "Save Changes" : "Add Note"),
             editingId && React.createElement("button", { type: "button", className: "secondary", onClick: cancelEdit }, "Cancel")
           ),
+
           selectedNote && React.createElement("div", { style: { background: "#eff6ff", border: "1px solid #bfdbfe", padding: "16px", borderRadius: "6px", marginBottom: "16px" } },
             React.createElement("h4", { style: { margin: "0 0 8px 0", color: "#1e40af" } }, `Note #${selectedNote.id}: ${selectedNote.title}`),
             React.createElement("p", { style: { margin: "0 0 12px 0", color: "#374151" } }, selectedNote.content || "(No content)"),
             React.createElement("button", { className: "secondary", onClick: () => setSelectedNote(null) }, "Close View")
           ),
-          React.createElement("h3", { style: { fontSize: "16px", marginBottom: "10px" } }, `Notes List (${notes.length})`),
-          notes.length === 0 && React.createElement("p", { style: { color: "#6b7280" } }, "No notes found."),
+
+          React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" } },
+            React.createElement("h3", { style: { fontSize: "16px", margin: 0 } }, `Notes List (${notes.length})`),
+            loading && React.createElement("span", { style: { fontSize: "12px", color: "#6b7280" } }, "Loading...")
+          ),
+
+          notes.length === 0 && !loading && React.createElement("p", { style: { color: "#6b7280" } }, "No notes found. Create your first note above."),
+
           React.createElement("div", null,
             notes.map((n) =>
               React.createElement("div", { key: n.id, className: "note-card" },
