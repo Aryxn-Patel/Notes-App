@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Notes App</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module">
+      import React, { useState, useEffect } from "https://esm.sh/react@18";
+      import ReactDOM from "https://esm.sh/react-dom@18/client";
+
+      const API_BASE_URL = window.API_URL || "http://127.0.0.1:8000";
+
+      function App() {
+        const [notes, setNotes] = useState([]);
+        const [title, setTitle] = useState("");
+        const [content, setContent] = useState("");
+        const [editingId, setEditingId] = useState(null);
+        const [selectedNote, setSelectedNote] = useState(null);
+        const [backendUrl, setBackendUrl] = useState(API_BASE_URL);
+
+        const fetchNotes = async () => {
+          try {
+            const res = await fetch(`${backendUrl}/notes`);
+            const data = await res.json();
+            setNotes(Array.isArray(data) ? data : []);
+          } catch (e) {
+            console.error(e);
+          }
+        };
+
+        useEffect(() => { fetchNotes(); }, [backendUrl]);
+
+        const handleSubmit = async (e) => {
+          e.preventDefault();
+          const url = editingId ? `${backendUrl}/notes/${editingId}` : `${backendUrl}/notes`;
+          const method = editingId ? "PUT" : "POST";
+          await fetch(url, {
+            method,
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ title, content })
+          });
+          setTitle("");
+          setContent("");
+          setEditingId(null);
+          fetchNotes();
+        };
+
+        const deleteNote = async (id) => {
+          await fetch(`${backendUrl}/notes/${id}`, { method: "DELETE" });
+          fetchNotes();
+        };
+
+        const viewNote = async (id) => {
+          const res = await fetch(`${backendUrl}/notes/${id}`);
+          const data = await res.json();
+          setSelectedNote(data);
+        };
+
+        return React.createElement("div", { style: { maxWidth: "600px", margin: "2rem auto", fontFamily: "sans-serif" } },
+          React.createElement("h2", null, "Notes App"),
+          React.createElement("div", { style: { marginBottom: "1rem" } },
+            React.createElement("label", null, "Backend URL: "),
+            React.createElement("input", {
+              style: { width: "70%", padding: "4px" },
+              value: backendUrl,
+              onChange: (e) => setBackendUrl(e.target.value)
+            })
+          ),
+          React.createElement("form", { onSubmit: handleSubmit, style: { marginBottom: "1rem" } },
+            React.createElement("input", {
+              placeholder: "Title",
+              required: true,
+              value: title,
+              onChange: (e) => setTitle(e.target.value),
+              style: { width: "100%", marginBottom: "0.5rem", padding: "8px", boxSizing: "border-box" }
+            }),
+            React.createElement("textarea", {
+              placeholder: "Content",
+              value: content,
+              onChange: (e) => setContent(e.target.value),
+              style: { width: "100%", marginBottom: "0.5rem", padding: "8px", boxSizing: "border-box" }
+            }),
+            React.createElement("button", { type: "submit" }, editingId ? "Save Note" : "Add Note"),
+            editingId && React.createElement("button", { type: "button", onClick: () => { setEditingId(null); setTitle(""); setContent(""); }, style: { marginLeft: "8px" } }, "Cancel")
+          ),
+          selectedNote && React.createElement("div", { style: { background: "#eee", padding: "10px", marginBottom: "10px" } },
+            React.createElement("h4", null, `Note #${selectedNote.id}: ${selectedNote.title}`),
+            React.createElement("p", null, selectedNote.content || "(empty)"),
+            React.createElement("button", { onClick: () => setSelectedNote(null) }, "Close")
+          ),
+          React.createElement("ul", { style: { listStyle: "none", padding: 0 } },
+            notes.map((n) =>
+              React.createElement("li", { key: n.id, style: { border: "1px solid #ccc", padding: "8px", marginBottom: "6px", display: "flex", justifyContent: "space-between" } },
+                React.createElement("span", null, React.createElement("strong", null, n.title), ` - ${n.content}`),
+                React.createElement("div", null,
+                  React.createElement("button", { onClick: () => viewNote(n.id) }, "View"),
+                  React.createElement("button", { onClick: () => { setEditingId(n.id); setTitle(n.title); setContent(n.content); }, style: { margin: "0 4px" } }, "Edit"),
+                  React.createElement("button", { onClick: () => deleteNote(n.id), style: { color: "red" } }, "Delete")
+                )
+              )
+            )
+          )
+        );
+      }
+
+      ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
+    </script>
+  </body>
+</html>
