@@ -1,6 +1,6 @@
 # Notes App — Fullstack CRUD Application
 
-A lightweight, full-stack Notes CRUD (Create, Read, Update, Delete) web application featuring a RESTful API built with **FastAPI (Python)** using in-memory state, and a reactive single-page frontend built with **React 18** via browser-native **JavaScript ES Modules**, deployed on **Render** and **Vercel**.
+A lightweight, full-stack Notes CRUD (Create, Read, Update, Delete) web application featuring an API built with **FastAPI (Python)** using in-memory state, and a reactive single-page frontend built with **React 18** via browser-native **JavaScript ES Modules**, deployed on **Render** and **Vercel**.
 
 ---
 
